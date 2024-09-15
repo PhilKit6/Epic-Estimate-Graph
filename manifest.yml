@@ -1,0 +1,19 @@
+modules:
+  jira:issuePanel:
+    - key: epic-estimate-graph-hello-world-issue-panel
+      resource: main
+      resolver:
+        function: resolver
+      render: native
+      title: Epic-Estimate-Graph
+      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+  function:
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: main
+    path: src/frontend/index.jsx
+app:
+  runtime:
+    name: nodejs20.x
+  id: ari:cloud:ecosystem::app/5484419a-4671-48f6-a85e-fa4f5db2f734
