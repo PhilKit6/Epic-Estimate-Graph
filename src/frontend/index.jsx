@@ -1,62 +1,100 @@
 import React, { useState, useEffect } from 'react';
 import ForgeReconciler, { Text, useProductContext } from '@forge/react';
-import { invoke, requestJira } from '@forge/bridge';
+import { requestJira } from '@forge/bridge';
 import { LineChart } from '@forge/react';
 
-const LineChartWithArrayDataExample = ({ storyPoints }) => {
-  // Updated to use dynamic storyPoints
+const LineChartWithArrayDataExample = ({ epicStoryPoints, summedChildStoryPoints }) => {
   const arrayData = [
-    // ['x value', 'y value', 'color value']
-    ['1', storyPoints ?? 0, 'Epic Estimate'],
-    ['1', 1, 'Sum of Effort'],
-    ['2', 45, 'Epic Estimate'],
-    ['2', 5, 'Sum of Effort'],
-    ['3', 43, 'Epic Estimate'],
-    ['3', 10, 'Sum of Effort'],
-    ['4', 30, 'Epic Estimate'],
-    ['4', 50, 'Sum of Effort'],
+    // ['x value', 'y value', 'series name']
+    ['1', epicStoryPoints ?? 0, 'Epic Story Points'],
+    ['1', summedChildStoryPoints ?? 0, 'Summed Child Story Points'],
+    ['2', 40, 'Epic Story Points'],
+    ['2', 14, 'Summed Child Story Points'],
+    ['3', 45, 'Epic Story Points'],
+    ['3', 20, 'Summed Child Story Points'],
   ];
 
   return (
     <LineChart
       data={arrayData}
-      xAccessor={0} // position 0 in item array
-      yAccessor={1} // position 1 in item array
-      colorAccessor={2} // position 2 in item array
+      xAccessor={0} // position 0 in item array (X-axis values)
+      yAccessor={1} // position 1 in item array (Y-axis values)
+      colorAccessor={2} // position 2 in item array (series name, to differentiate the two lines)
     />
   );
 };
 
 const App = () => {
   const context = useProductContext();
-  const [storyPoints, setStoryPoints] = useState(null);
-  const [data, setData] = useState(null);
+  const [epicStoryPoints, setEpicStoryPoints] = useState(null);
+  const [summedChildStoryPoints, setSummedChildStoryPoints] = useState(null);
 
-  const fetchStoryPointsForIssue = async () => {
+  // Function to fetch the Epic's story points
+  const fetchEpicStoryPoints = async () => {
     const issueId = context?.extension.issue.id;
+
+    // Fetch the epic issue
     const res = await requestJira(`/rest/api/3/issue/${issueId}`);
     const data = await res.json();
-    return data.fields["customfield_10035"]; // Access the storypoints field
+
+    console.log("Epic Data: ", data); // Debugging
+
+    // Replace with your Epic's story points field ID
+    return data.fields["customfield_10035"]; 
+  };
+
+  // Function to fetch child issues linked to the epic and sum their story points
+  const fetchAndSumChildStoryPoints = async () => {
+    const epicKey = context?.extension.issue.key;
+
+    // JQL query to find all issues linked to this epic
+    const jql = `\"Epic Link\" = ${epicKey}`;
+
+    // Fetch all issues linked to the epic
+    const res = await requestJira(`/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=customfield_10035&maxResults=1000`);
+    const data = await res.json();
+
+    console.log("Child Issues Data: ", data); // Debugging
+
+    const issues = data.issues;
+
+    let totalStoryPoints = 0;
+
+    for (const issue of issues) {
+      const storyPoints = issue.fields["customfield_10035"]; // Replace with your Story Points field ID
+
+      if (storyPoints !== undefined && storyPoints !== null) {
+        totalStoryPoints += storyPoints;
+      }
+    }
+
+    console.log("Total Summed Story Points from Child Issues: ", totalStoryPoints); // Debugging
+
+    return totalStoryPoints;
   };
 
   useEffect(() => {
     if (context) {
-      fetchStoryPointsForIssue().then(setStoryPoints);
+      // Fetch the epic's story points
+      fetchEpicStoryPoints().then((epicPoints) => {
+        setEpicStoryPoints(epicPoints);
+
+        // Fetch and sum the child issues' story points
+        fetchAndSumChildStoryPoints().then((summedPoints) => {
+          setSummedChildStoryPoints(summedPoints);
+        });
+      });
     }
   }, [context]);
 
-  useEffect(() => {
-    invoke('getText', { example: 'my-invoke-variable' }).then(setData);
-  }, []);
-
   return (
     <>
-      <Text>eyup world</Text>
-      <Text>{data ? data : 'Loading...'}</Text>
-
-      {/* Render the LineChart component only when storyPoints is available */}
-      {storyPoints !== null ? (
-        <LineChartWithArrayDataExample storyPoints={storyPoints} />
+      {/* Render the LineChart component only when both epicStoryPoints and summedChildStoryPoints are available */}
+      {epicStoryPoints !== null && summedChildStoryPoints !== null ? (
+        <LineChartWithArrayDataExample
+          epicStoryPoints={epicStoryPoints}
+          summedChildStoryPoints={summedChildStoryPoints}
+        />
       ) : (
         <Text>Loading story points...</Text>
       )}
