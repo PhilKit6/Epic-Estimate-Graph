@@ -1,53 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import ForgeReconciler, { Text, useProductContext } from '@forge/react';
-import { invoke } from '@forge/bridge';
+import { invoke, requestJira } from '@forge/bridge';
 import { LineChart } from '@forge/react';
-import { requestJira } from '@forge/bridge';
-import { DynamicTable, Link } from "@forge/react";
 
+const LineChartWithArrayDataExample = ({ storyPoints }) => {
+  // Updated to use dynamic storyPoints
+  const arrayData = [
+    // ['x value', 'y value', 'color value']
+    ['1', storyPoints ?? 0, 'Epic Estimate'],
+    ['1', 1, 'Sum of Effort'],
+    ['2', 45, 'Epic Estimate'],
+    ['2', 5, 'Sum of Effort'],
+    ['3', 43, 'Epic Estimate'],
+    ['3', 10, 'Sum of Effort'],
+    ['4', 30, 'Epic Estimate'],
+    ['4', 50, 'Sum of Effort'],
+  ];
 
-const context = useProductContext();
-
-const [storyPoints, setStoryPoints] = React.useState(null);
-
-const fetchStoryPointsForIssue = async () => {
-  const issueId = context?.extension.issue.id;
-  const res = await requestJira(`/rest/api/3/issue/${issueId}`);
-  const data = await res.json();
-  return data.fields["customfield_10035"]; // Access the storypoints field 
-};
-
-React.useEffect(() => {
-  if (context) {
-    fetchStoryPointsForIssue().then(setStoryPoints);
-  }
-}, [context]);
-
-// Sample data array (can be moved to a separate file if needed)
-const arrayData = [
-  // in this example ['x value', 'y value', 'color value']
-  ['Apple',`${storyPoints}`, 'Dog'],
-  ['Apple', 1, 'Cat'],
-  ['Apple', 25, 'Horse'],
-  ['Apple', 5, 'Elephant'],
-  ['Banana', 5, 'Dog'],
-  ['Banana', 5, 'Cat'],
-  ['Banana', 15, 'Horse'],
-  ['Banana', 20, 'Elephant'],
-  ['Kumquat', 15, 'Dog'],
-  ['Kumquat', 10, 'Cat'],
-  ['Kumquat', 25, 'Horse'],
-  ['Kumquat', 20, 'Elephant'],
-  ['Dragonfruit', 30, 'Dog'],
-  ['Dragonfruit', 20, 'Cat'],
-  ['Dragonfruit', 5, 'Horse'],
-  ['Dragonfruit', 10, 'Elephant'],
-];
-
-// The chart component definition
-const LineChartWithArrayDataExample = () => {
   return (
-    <LineChart 
+    <LineChart
       data={arrayData}
       xAccessor={0} // position 0 in item array
       yAccessor={1} // position 1 in item array
@@ -57,7 +28,22 @@ const LineChartWithArrayDataExample = () => {
 };
 
 const App = () => {
+  const context = useProductContext();
+  const [storyPoints, setStoryPoints] = useState(null);
   const [data, setData] = useState(null);
+
+  const fetchStoryPointsForIssue = async () => {
+    const issueId = context?.extension.issue.id;
+    const res = await requestJira(`/rest/api/3/issue/${issueId}`);
+    const data = await res.json();
+    return data.fields["customfield_10035"]; // Access the storypoints field
+  };
+
+  useEffect(() => {
+    if (context) {
+      fetchStoryPointsForIssue().then(setStoryPoints);
+    }
+  }, [context]);
 
   useEffect(() => {
     invoke('getText', { example: 'my-invoke-variable' }).then(setData);
@@ -67,9 +53,13 @@ const App = () => {
     <>
       <Text>eyup world</Text>
       <Text>{data ? data : 'Loading...'}</Text>
-      
-      {/* Render the LineChart component below */}
-      <LineChartWithArrayDataExample />
+
+      {/* Render the LineChart component only when storyPoints is available */}
+      {storyPoints !== null ? (
+        <LineChartWithArrayDataExample storyPoints={storyPoints} />
+      ) : (
+        <Text>Loading story points...</Text>
+      )}
     </>
   );
 };
